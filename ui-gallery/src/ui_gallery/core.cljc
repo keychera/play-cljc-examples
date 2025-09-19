@@ -22,17 +22,17 @@
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
   ;; load font
   (#?(:clj load-font-clj :cljs load-font-cljs) :roboto
-     (fn [{:keys [data]} baked-font]
-       (let [font-entity (text/->font-entity game data baked-font)
-             compiled-font-entity (c/compile game font-entity)
-             ;; an entity whose text can't change
-             static-entity (c/compile game (text/->text-entity game compiled-font-entity "Hello, world!"))
-             ;; an entity whose text can be set dynamically
-             dynamic-entity (c/compile game (i/->instanced-entity font-entity))]
-         (swap! *state assoc
-                :font-entity font-entity
-                :static-entity static-entity
-                :dynamic-entity dynamic-entity)))))
+                                               (fn [{:keys [data]} baked-font]
+                                                 (let [font-entity (text/->font-entity game data baked-font)
+                                                       compiled-font-entity (c/compile game font-entity)
+                                                       ;; an entity whose text can't change
+                                                       static-entity (c/compile game (text/->text-entity game compiled-font-entity "Hello, world!"))
+                                                       ;; an entity whose text can be set dynamically
+                                                       dynamic-entity (c/compile game (i/->instanced-entity font-entity))]
+                                                   (swap! *state assoc
+                                                          :font-entity font-entity
+                                                          :static-entity static-entity
+                                                          :dynamic-entity dynamic-entity)))))
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
@@ -69,37 +69,37 @@
         ;; render the colored text
         (update-fps!)
         (c/render game (-> (reduce-kv
-                             chars/assoc-char
-                             dynamic-entity
-                             (mapv (fn [ch color]
-                                     (-> font-entity
-                                         (chars/crop-char ch)
-                                         (t/color color)))
-                               "Colors"
-                               (cycle
-                                 [[1 0 0 1]
-                                  [0 1 0 1]
-                                  [0 0 1 1]])))
+                            chars/assoc-char
+                            dynamic-entity
+                            (mapv (fn [ch color]
+                                    (-> font-entity
+                                        (chars/crop-char ch)
+                                        (t/color color)))
+                                  "Colors"
+                                  (cycle
+                                   [[1 0 0 1]
+                                    [0 1 0 1]
+                                    [0 0 1 1]])))
                            (t/project game-width game-height)
                            (t/translate 0 100)))
         ;; render the frame count
         (let [num-of-text 200
               fps (:fps @fps-counter*)
-              text ["Frame count:" 
+              text ["Frame count:"
                     (str/join " " (take num-of-text (repeat (str counter))))
                     "Frame time"
                     (str (* (:delta-time game) 1000) " ms")
-                    "FPS" 
-                    (str/join " " (take num-of-text (repeat (str fps)))) ]
+                    "FPS"
+                    (str/join " " (take num-of-text (repeat (str fps))))]
               text (conj text "char count" (str (reduce + (map count text))))]
           (c/render game (-> #_(reduce
-                              (partial apply chars/assoc-char)
-                              dynamic-entity
-                              (for [line-num (range (count text))
-                                    char-num (range (count (nth text line-num)))
-                                    :let [ch (get-in text [line-num char-num])]]
-                                [line-num char-num (chars/crop-char font-entity ch)]))
-                             (chars/assoc-lines dynamic-entity font-entity text)
+                                (partial apply chars/assoc-char)
+                                dynamic-entity
+                                (for [line-num (range (count text))
+                                      char-num (range (count (nth text line-num)))
+                                      :let [ch (get-in text [line-num char-num])]]
+                                  [line-num char-num (chars/crop-char font-entity ch)]))
+                          (chars/assoc-lines dynamic-entity font-entity text)
                              (t/project game-width game-height)
                              (t/translate 0 200)))))))
   ;; return the game map

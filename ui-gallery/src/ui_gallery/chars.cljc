@@ -39,10 +39,10 @@
          (i/assoc (+ index prev-count)
                   (-> char-entity
                       (update-in [:uniforms 'u_translate_matrix]
-                        #(m/multiply-matrices 3 (m/translation-matrix prev-xadv y-total) %))))
+                                 #(m/multiply-matrices 3 (m/translation-matrix prev-xadv y-total) %))))
          ;; adjust the next char if its horizontal position changed
          (cond-> (and next-char (not= (:x-total replaced-char) x-total))
-                 (assoc-char line-num (inc index) next-char))))))
+           (assoc-char line-num (inc index) next-char))))))
 
 (defn get-baked-char [font ch]
   (let [{:keys [baked-chars first-char]} (:baked-font font)
@@ -52,13 +52,15 @@
 (defn assoc-lines
   [dynamic-entity font-entity lines]
   (let [baseline    (-> font-entity :baked-font :baseline)
-        i->baked-ch (->> (map-indexed (fn [line-num line] (map (fn [ch] [line-num (get-baked-char font-entity ch)]) (vec line))) lines)
-                         (mapcat identity)
-                         (map-indexed (fn [i [line-num baked]] [i line-num baked])))
-        i->xadv     (->> (update-vals (group-by second i->baked-ch) ;; group-by line-num
-                                      #(reductions + 0 (map (fn [[_i _line-num baked-ch]] (:xadv baked-ch)) (drop-last %))))
-                         (mapcat second)
-                         (into []))]
+        i->baked-ch (into []
+                          (comp (map-indexed (fn [line-num line] (map (fn [ch] [line-num (get-baked-char font-entity ch)]) (vec line))))
+                                (mapcat identity)
+                                (map-indexed (fn [i [line-num baked]] [i line-num baked])))
+                          lines)
+        i->xadv     (into []
+                          (comp (map #(reductions + 0 (map (fn [[_i _line-num baked-ch]] (:xadv baked-ch)) (drop-last %))))
+                                (mapcat identity))
+                          (vals (group-by second i->baked-ch)))]
     (reduce
      (fn [entity [char-i line-num baked-char]]
        (let [{:keys [x y w h xoff yoff]} baked-char
@@ -92,5 +94,5 @@
          (assoc-in [:characters line-num] line)
          (i/dissoc (+ index prev-count))
          (cond-> next-char
-                 (assoc-char line-num index next-char))))))
+           (assoc-char line-num index next-char))))))
 
