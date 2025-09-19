@@ -52,6 +52,7 @@
 (defn assoc-lines
   [dynamic-entity font-entity lines]
   (let [baseline    (-> font-entity :baked-font :baseline)
+        font-height (-> font-entity :baked-font :font-height) 
         i->baked-ch (into []
                           (comp (map-indexed (fn [line-num line] (map (fn [ch] [line-num (get-baked-char font-entity ch)]) (vec line))))
                                 (mapcat identity)
@@ -64,20 +65,69 @@
     (reduce
      (fn [entity [char-i line-num baked-char]]
        (let [{:keys [x y w h xoff yoff]} baked-char
+             xadv        (get i->xadv char-i)
+             y-total     (* line-num font-height)
              char-entity (-> font-entity
                              (t/crop x y w h)
                              (assoc-in [:uniforms 'u_scale_matrix]
                                        (m/scaling-matrix w h))
                              (assoc-in [:uniforms 'u_translate_matrix]
-                                       (m/translation-matrix xoff (+ baseline yoff))))
-             xadv        (get i->xadv char-i)
-             y-total     (* line-num (-> font-entity :baked-font :font-height))]
-         (i/assoc entity char-i
-                  (-> char-entity
-                      (update-in [:uniforms 'u_translate_matrix]
-                                 #(m/multiply-matrices 3 (m/translation-matrix xadv y-total) %))))))
+                                       (m/translation-matrix (+ xoff xadv) (+ baseline yoff y-total))))]
+         (i/assoc entity char-i char-entity)))
      dynamic-entity
      i->baked-ch)))
+
+(defn assoc-lines2
+  [dynamic-entity font-entity lines]
+  (let [baseline    (-> font-entity :baked-font :baseline)
+        font-height (-> font-entity :baked-font :font-height)
+        i->line+ch  (into []
+                          (comp (map-indexed vector)
+                                (map (fn [[line-num line]] (->> (vec line) (map (fn [ch] [line-num ch])))))
+                                (mapcat identity))
+                          lines)
+        total-ch    (count i->line+ch)]
+    (loop [char-i 0 total-xadv 0 prev-line-num -1 entity dynamic-entity]
+      (if (< char-i total-ch)
+        (let [[line-num ch] (nth i->line+ch char-i)
+              baked-ch      (get-baked-char font-entity ch)
+              {:keys [x y w h xoff yoff xadv]} baked-ch
+              y-total     (* line-num font-height)
+              total-xadv  (if (= line-num prev-line-num) total-xadv 0)
+              char-entity (-> font-entity
+                              (t/crop x y w h)
+                              (assoc-in [:uniforms 'u_scale_matrix]
+                                        (m/scaling-matrix w h))
+                              (assoc-in [:uniforms 'u_translate_matrix]
+                                        (m/translation-matrix (+ xoff total-xadv) (+ baseline yoff y-total))))
+              entity      (i/assoc entity char-i char-entity)]
+          (recur (inc char-i) (+ total-xadv xadv) line-num entity))
+        entity))))
+
+(defn assoc-lines3
+  [dynamic-entity font-entity lines]
+  (let [baseline    (-> font-entity :baked-font :baseline)
+        font-height (-> font-entity :baked-font :font-height)
+        text        (reduce #(str %1 "\n" %2) lines) 
+        total-ch    (- (count text) (dec (count lines)))]
+    (loop [char-i 0 total-xadv 0 curr-line-num 0 prev-line-num -1 entity dynamic-entity]
+      (if (< char-i total-ch)
+        (let [ch (get text (+ curr-line-num char-i))] 
+          (if (not= "\n" ch)
+            (let [baked-ch      (get-baked-char font-entity ch)
+                  {:keys [x y w h xoff yoff xadv]} baked-ch
+                  y-total     (* curr-line-num font-height)
+                  total-xadv  (if (= curr-line-num prev-line-num) total-xadv 0)
+                  char-entity (-> font-entity
+                                  (t/crop x y w h)
+                                  (assoc-in [:uniforms 'u_scale_matrix]
+                                            (m/scaling-matrix w h))
+                                  (assoc-in [:uniforms 'u_translate_matrix]
+                                            (m/translation-matrix (+ xoff total-xadv) (+ baseline yoff y-total))))
+                  entity      (i/assoc entity char-i char-entity)]
+              (recur (inc char-i) (+ total-xadv xadv) curr-line-num curr-line-num entity))
+            (recur char-i total-xadv (inc curr-line-num) prev-line-num entity)))
+        entity))))
 
 (defn dissoc-char
   ([text-entity index]
