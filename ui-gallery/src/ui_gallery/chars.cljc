@@ -44,6 +44,39 @@
          (cond-> (and next-char (not= (:x-total replaced-char) x-total))
                  (assoc-char line-num (inc index) next-char))))))
 
+(defn get-baked-char [font ch]
+  (let [{:keys [baked-chars first-char]} (:baked-font font)
+        char-code (- #?(:clj (int ch) :cljs (.charCodeAt ch 0)) first-char)]
+    (nth baked-chars char-code)))
+
+(defn assoc-lines
+  [dynamic-entity font-entity lines]
+  (let [baseline    (-> font-entity :baked-font :baseline)
+        i->baked-ch (->> (map-indexed (fn [line-num line] (map (fn [ch] [line-num (get-baked-char font-entity ch)]) (vec line))) lines)
+                         (mapcat identity)
+                         (map-indexed (fn [i [line-num baked]] [i line-num baked])))
+        i->xadv     (->> (update-vals (group-by second i->baked-ch) ;; group-by line-num
+                                      #(reductions + 0 (map (fn [[_i _line-num baked-ch]] (:xadv baked-ch)) (drop-last %))))
+                         (mapcat second)
+                         (into []))]
+    (reduce
+     (fn [entity [char-i line-num baked-char]]
+       (let [{:keys [x y w h xoff yoff]} baked-char
+             char-entity (-> font-entity
+                             (t/crop x y w h)
+                             (assoc-in [:uniforms 'u_scale_matrix]
+                                       (m/scaling-matrix w h))
+                             (assoc-in [:uniforms 'u_translate_matrix]
+                                       (m/translation-matrix xoff (+ baseline yoff))))
+             xadv        (get i->xadv char-i)
+             y-total     (* line-num (-> font-entity :baked-font :font-height))]
+         (i/assoc entity char-i
+                  (-> char-entity
+                      (update-in [:uniforms 'u_translate_matrix]
+                                 #(m/multiply-matrices 3 (m/translation-matrix xadv y-total) %))))))
+     dynamic-entity
+     i->baked-ch)))
+
 (defn dissoc-char
   ([text-entity index]
    (dissoc-char text-entity 0 index))

@@ -1,5 +1,6 @@
 (ns ui-gallery.core
-  (:require [ui-gallery.utils :as utils]
+  (:require [clojure.string :as str]
+            [ui-gallery.utils :as utils]
             [ui-gallery.chars :as chars]
             [play-cljc.gl.core :as c]
             [play-cljc.transforms :as t]
@@ -37,6 +38,17 @@
   {:viewport {:x 0 :y 0 :width 0 :height 0}
    :clear {:color [(/ 173 255) (/ 216 255) (/ 230 255) 1] :depth 1}})
 
+(defonce fps-counter*
+  (volatile! {:last-time #?(:clj (System/currentTimeMillis) :cljs (js/performance.now)) :frames 0 :fps 0}))
+
+(defn update-fps! []
+  (let [now #?(:clj (System/currentTimeMillis) :cljs (js/performance.now))
+        {:keys [last-time frames]} @fps-counter*
+        delta (- now last-time)]
+    (if (> delta 1000) ;; 1 second has passed
+      (vswap! fps-counter* assoc :last-time now :frames 0 :fps frames)
+      (vswap! fps-counter* update :frames inc))))
+
 (defn tick [game]
   (let [state (swap! *state update :counter inc)
         {:keys [font-entity
@@ -55,6 +67,7 @@
                            (t/scale (:width static-entity) (:height static-entity))
                            (t/translate 0 0)))
         ;; render the colored text
+        (update-fps!)
         (c/render game (-> (reduce-kv
                              chars/assoc-char
                              dynamic-entity
@@ -70,14 +83,23 @@
                            (t/project game-width game-height)
                            (t/translate 0 100)))
         ;; render the frame count
-        (let [text ["Frame count:" (str counter)]]
-          (c/render game (-> (reduce
-                               (partial apply chars/assoc-char)
-                               dynamic-entity
-                               (for [line-num (range (count text))
-                                     char-num (range (count (nth text line-num)))
-                                     :let [ch (get-in text [line-num char-num])]]
-                                 [line-num char-num (chars/crop-char font-entity ch)]))
+        (let [num-of-text 200
+              fps (:fps @fps-counter*)
+              text ["Frame count:" 
+                    (str/join " " (take num-of-text (repeat (str counter))))
+                    "Frame time"
+                    (str (* (:delta-time game) 1000) " ms")
+                    "FPS" 
+                    (str/join " " (take num-of-text (repeat (str fps)))) ]
+              text (conj text "char count" (str (reduce + (map count text))))]
+          (c/render game (-> #_(reduce
+                              (partial apply chars/assoc-char)
+                              dynamic-entity
+                              (for [line-num (range (count text))
+                                    char-num (range (count (nth text line-num)))
+                                    :let [ch (get-in text [line-num char-num])]]
+                                [line-num char-num (chars/crop-char font-entity ch)]))
+                             (chars/assoc-lines dynamic-entity font-entity text)
                              (t/project game-width game-height)
                              (t/translate 0 200)))))))
   ;; return the game map
