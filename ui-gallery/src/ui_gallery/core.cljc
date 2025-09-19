@@ -99,7 +99,7 @@
                                       char-num (range (count (nth text line-num)))
                                       :let     [ch (get-in text [line-num char-num])]]
                                   [line-num char-num (chars/crop-char font-entity ch)]))
-                             (chars/assoc-lines3 dynamic-entity font-entity text)
+                             (chars/assoc-lines2 dynamic-entity font-entity text)
                              (t/project game-width game-height)
                              (t/translate 0 200)))))))
   ;; return the game map

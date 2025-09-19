@@ -109,11 +109,11 @@
   (let [baseline    (-> font-entity :baked-font :baseline)
         font-height (-> font-entity :baked-font :font-height)
         text        (reduce #(str %1 "\n" %2) lines) 
-        total-ch    (- (count text) (dec (count lines)))]
+        total-ch    (count text)]
     (loop [char-i 0 total-xadv 0 curr-line-num 0 prev-line-num -1 entity dynamic-entity]
       (if (< char-i total-ch)
-        (let [ch (get text (+ curr-line-num char-i))] 
-          (if (not= "\n" ch)
+        (let [ch (get text char-i)]
+          (if (not= \newline ch)
             (let [baked-ch      (get-baked-char font-entity ch)
                   {:keys [x y w h xoff yoff xadv]} baked-ch
                   y-total     (* curr-line-num font-height)
@@ -124,9 +124,9 @@
                                             (m/scaling-matrix w h))
                                   (assoc-in [:uniforms 'u_translate_matrix]
                                             (m/translation-matrix (+ xoff total-xadv) (+ baseline yoff y-total))))
-                  entity      (i/assoc entity char-i char-entity)]
+                  entity      (i/assoc entity (- char-i curr-line-num) char-entity)]
               (recur (inc char-i) (+ total-xadv xadv) curr-line-num curr-line-num entity))
-            (recur char-i total-xadv (inc curr-line-num) prev-line-num entity)))
+            (recur (inc char-i) total-xadv (inc curr-line-num) prev-line-num entity)))
         entity))))
 
 (defn dissoc-char
