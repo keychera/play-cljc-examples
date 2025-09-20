@@ -83,7 +83,7 @@
                            (t/project game-width game-height)
                            (t/translate 0 100)))
         ;; render the frame count
-        (let [text-mult 1000
+        (let [text-mult 3000
               fps (:fps @fps-counter*)
               text ["Frame count:"
                     (str/join " " (take text-mult (repeat (str counter))))

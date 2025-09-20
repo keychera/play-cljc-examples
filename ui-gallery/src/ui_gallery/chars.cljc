@@ -1,7 +1,10 @@
 (ns ui-gallery.chars
   (:require [play-cljc.transforms :as t]
             [play-cljc.math :as m]
-            [play-cljc.instances :as i]))
+            [play-cljc.instances :as i]
+            #?(:clj [clojure.core.memoize :as memo])))
+
+#?(:clj (set! *warn-on-reflection* true))
 
 (defn crop-char [{:keys [baked-font] :as font-entity} ch]
   (let [{:keys [baked-chars baseline first-char]} baked-font
@@ -15,8 +18,6 @@
         (assoc-in [:uniforms 'u_translate_matrix]
                   (m/translation-matrix xoff (+ baseline yoff)))
         (assoc :baked-char baked-char))))
-
-(set! *warn-on-reflection* true)
 
 (defn assoc-char
   ([text-entity index char-entity]
@@ -106,10 +107,23 @@
           (recur (inc char-i) (+ total-xadv xadv) line-num entity))
         entity))))
 
+(defn get-crop [font-entity baked-ch]
+  (let [{:keys [width height]} font-entity
+        font_texture_matrix (get-in font-entity [:uniforms 'u_texture_matrix])
+        {:keys [x y w h xoff yoff ^double xadv]} baked-ch]
+    (->> font_texture_matrix
+         (m/multiply-matrices
+          (m/translation-matrix (/ x width) (/ y height)))
+         (m/multiply-matrices
+          (m/scaling-matrix (/ w width) (/ h height))))))
+
+(def memo-crop
+  #?(:clj (memo/memo get-crop)
+     :cljs (memoize get-crop)))
+
 (defn assoc-lines3
   [dynamic-entity font-entity lines]
-  (let [{:keys [width height baked-font]} font-entity
-        font_texture_matrix (get-in font-entity [:uniforms 'u_texture_matrix])
+  (let [{:keys [baked-font]} font-entity
         baseline            (-> baked-font :baseline)
         font-height         (-> baked-font :font-height)
         i->line+ch          (into []
@@ -127,15 +141,11 @@
         (let [[line-num ch] (get i->line+ch char-i)
               baked-ch      (get-baked-char font-entity ch)
 
-              {:keys [x y w h xoff yoff ^double xadv]} baked-ch
+              {:keys [w h xoff yoff ^double xadv]} baked-ch
               y-total     (* line-num font-height)
               total-xadv  (if (= line-num prev-line-num) total-xadv 0)
 
-              u_crop      (->> font_texture_matrix
-                               (m/multiply-matrices
-                                (m/translation-matrix (/ x width) (/ y height)))
-                               (m/multiply-matrices
-                                (m/scaling-matrix (/ w width) (/ h height))))
+              u_crop      (memo-crop font-entity baked-ch)
               u_scaling   (m/scaling-matrix w h)
               u_translate (m/translation-matrix (+ xoff total-xadv) (+ baseline yoff y-total))
               u_color     [0.2 0.4 0.3 1]]
