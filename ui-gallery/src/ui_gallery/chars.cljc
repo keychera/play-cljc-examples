@@ -16,6 +16,8 @@
                   (m/translation-matrix xoff (+ baseline yoff)))
         (assoc :baked-char baked-char))))
 
+(set! *warn-on-reflection* true)
+
 (defn assoc-char
   ([text-entity index char-entity]
    (assoc-char text-entity 0 index char-entity))
@@ -52,7 +54,7 @@
 (defn assoc-lines
   [dynamic-entity font-entity lines]
   (let [baseline    (-> font-entity :baked-font :baseline)
-        font-height (-> font-entity :baked-font :font-height) 
+        font-height (-> font-entity :baked-font :font-height)
         i->baked-ch (into []
                           (comp (map-indexed (fn [line-num line] (map (fn [ch] [line-num (get-baked-char font-entity ch)]) (vec line))))
                                 (mapcat identity)
@@ -87,11 +89,11 @@
                                 (mapcat identity))
                           lines)
         total-ch    (count i->line+ch)]
-    (loop [char-i 0 total-xadv 0 prev-line-num -1 entity dynamic-entity]
+    (loop [char-i 0 total-xadv 0.0 prev-line-num -1 entity dynamic-entity]
       (if (< char-i total-ch)
         (let [[line-num ch] (nth i->line+ch char-i)
               baked-ch      (get-baked-char font-entity ch)
-              {:keys [x y w h xoff yoff xadv]} baked-ch
+              {:keys [x y w h xoff yoff ^double xadv]} baked-ch
               y-total     (* line-num font-height)
               total-xadv  (if (= line-num prev-line-num) total-xadv 0)
               char-entity (-> font-entity
@@ -106,28 +108,57 @@
 
 (defn assoc-lines3
   [dynamic-entity font-entity lines]
-  (let [baseline    (-> font-entity :baked-font :baseline)
-        font-height (-> font-entity :baked-font :font-height)
-        text        (reduce #(str %1 "\n" %2) lines) 
-        total-ch    (count text)]
-    (loop [char-i 0 total-xadv 0 curr-line-num 0 prev-line-num -1 entity dynamic-entity]
+  (let [{:keys [width height baked-font]} font-entity
+        font_texture_matrix (get-in font-entity [:uniforms 'u_texture_matrix])
+        baseline            (-> baked-font :baseline)
+        font-height         (-> baked-font :font-height)
+        i->line+ch          (into []
+                                  (comp (map-indexed vector)
+                                        (map (fn [[line-num line]] (->> (vec line) (map (fn [ch] [line-num ch])))))
+                                        (mapcat identity))
+                                  lines)
+        total-ch    (count i->line+ch)]
+    (loop [char-i 0 total-xadv 0.0 prev-line-num #?(:clj (Long. -1) :cljs -1)
+           a_texture   (transient [])
+           a_scaling   (transient [])
+           a_translate (transient [])
+           a_color     (transient [])]
       (if (< char-i total-ch)
-        (let [ch (get text char-i)]
-          (if (not= \newline ch)
-            (let [baked-ch      (get-baked-char font-entity ch)
-                  {:keys [x y w h xoff yoff xadv]} baked-ch
-                  y-total     (* curr-line-num font-height)
-                  total-xadv  (if (= curr-line-num prev-line-num) total-xadv 0)
-                  char-entity (-> font-entity
-                                  (t/crop x y w h)
-                                  (assoc-in [:uniforms 'u_scale_matrix]
-                                            (m/scaling-matrix w h))
-                                  (assoc-in [:uniforms 'u_translate_matrix]
-                                            (m/translation-matrix (+ xoff total-xadv) (+ baseline yoff y-total))))
-                  entity      (i/assoc entity (- char-i curr-line-num) char-entity)]
-              (recur (inc char-i) (+ total-xadv xadv) curr-line-num curr-line-num entity))
-            (recur (inc char-i) total-xadv (inc curr-line-num) prev-line-num entity)))
-        entity))))
+        (let [[line-num ch] (get i->line+ch char-i)
+              baked-ch      (get-baked-char font-entity ch)
+
+              {:keys [x y w h xoff yoff ^double xadv]} baked-ch
+              y-total     (* line-num font-height)
+              total-xadv  (if (= line-num prev-line-num) total-xadv 0)
+
+              u_crop      (->> font_texture_matrix
+                               (m/multiply-matrices
+                                (m/translation-matrix (/ x width) (/ y height)))
+                               (m/multiply-matrices
+                                (m/scaling-matrix (/ w width) (/ h height))))
+              u_scaling   (m/scaling-matrix w h)
+              u_translate (m/translation-matrix (+ xoff total-xadv) (+ baseline yoff y-total))
+              u_color     [0.2 0.4 0.3 1]]
+          ;; (println (type line-num) (type xadv) (type total-xadv))
+          (recur (inc char-i) (+ total-xadv xadv) line-num
+                 (reduce conj! a_texture u_crop)
+                 (reduce conj! a_scaling u_scaling)
+                 (reduce conj! a_translate u_translate)
+                 (reduce conj! a_color u_color)))
+        (let [a_texture   (persistent! a_texture)
+              a_scaling   (persistent! a_scaling)
+              a_translate (persistent! a_translate)
+              a_color     (persistent! a_color)
+              res (-> dynamic-entity
+                      (update :attributes
+                              (fn [attrs]
+                                (assoc attrs
+                                       'a_texture_matrix {:data a_texture :divisor 1}
+                                       'a_scale_matrix {:data a_scaling :divisor 1}
+                                       'a_translate_matrix {:data a_translate :divisor 1}
+                                       'a_color {:data a_color :divisor 1}))))]
+          ;; #?(:clj (do (throw (Exception. "hmm2"))))
+          res)))))
 
 (defn dissoc-char
   ([text-entity index]
