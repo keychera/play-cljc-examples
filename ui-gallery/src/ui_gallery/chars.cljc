@@ -7,6 +7,8 @@
    [play-cljc.transforms :as t]))
 
 #?(:clj (set! *warn-on-reflection* true))
+#?(:clj (set! *unchecked-math* true))
+
 
 (defn crop-char [{:keys [baked-font] :as font-entity} ch]
   (let [{:keys [baked-chars baseline first-char]} baked-font
@@ -162,7 +164,7 @@
               u_translate (m/translation-matrix (+ xoff total-xadv) (+ baseline yoff y-total))
               u_color     [0.2 0.4 0.3 1]]
           ;; (println (type line-num) (type xadv) (type total-xadv))
-          (recur (inc char-i) (+ total-xadv xadv) line-num
+          (recur (inc char-i) (+ total-xadv xadv) line-num 
                  (reduce conj! a_texture u_crop)
                  (reduce conj! a_scaling u_scaling)
                  (reduce conj! a_translate u_translate)
@@ -212,11 +214,11 @@
               u_color     [0.2 0.4 0.3 1]]
           ;; (println (type line-num) (type xadv) (type total-xadv))
           (dotimes [i 9]
-            (aset-float a_texture (+ (* char-i 9) i) (nth u_crop i))
-            (aset-float a_scaling (+ (* char-i 9) i) (nth u_scaling i))
-            (aset-float a_translate (+ (* char-i 9) i) (nth u_translate i)))
+            (aset a_texture (+ (* char-i 9) i) (unchecked-float (nth u_crop i)))
+            (aset a_scaling (+ (* char-i 9) i) (unchecked-float (nth u_scaling i)))
+            (aset a_translate (+ (* char-i 9) i) (unchecked-float (nth u_translate i))))
           (dotimes [i 4]
-            (aset-float a_color (+ (* char-i 4) i) (nth u_color i)))
+            (aset a_color (+ (* char-i 4) i) (unchecked-float (nth u_color i))))
           (recur (inc char-i) (+ total-xadv xadv) line-num))
         (let [res (-> dynamic-entity
                       (update :attributes
