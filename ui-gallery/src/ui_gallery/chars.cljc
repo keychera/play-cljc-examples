@@ -157,7 +157,7 @@
               y-total     (* line-num font-height)
               total-xadv  (if (= line-num prev-line-num) total-xadv 0)
 
-              u_crop      (get-crop font-entity baked-ch)
+              u_crop      (memo-crop font-entity baked-ch)
               u_scaling   (m/scaling-matrix w h)
               u_translate (m/translation-matrix (+ xoff total-xadv) (+ baseline yoff y-total))
               u_color     [0.2 0.4 0.3 1]]
@@ -226,6 +226,67 @@
                                        'a_scale_matrix {:data a_scaling :type (gl game FLOAT) :divisor 1}
                                        'a_translate_matrix {:data a_translate :type (gl game FLOAT) :divisor 1}
                                        'a_color {:data a_color :type (gl game FLOAT) :divisor 1}))))]
+          ;; #?(:clj (do (throw (Exception. "hmm2"))))
+          res)))))
+
+(defn assoc-lines5
+  [dynamic-entity font-entity lines]
+  (let [{:keys [baked-font]} font-entity
+        baseline            (-> baked-font :baseline)
+        font-height         (-> baked-font :font-height)
+        i->line+ch          (into []
+                                  (comp (map-indexed vector)
+                                        (map (fn [[line-num line]] (->> (vec line) (map (fn [ch] [line-num ch])))))
+                                        (mapcat identity))
+                                  lines)
+        total-ch    (count i->line+ch)]
+    (loop [char-i 0 total-xadv 0.0 prev-line-num #?(:clj (Long. -1) :cljs -1)
+           a_texture   (transient [])
+           a_scaling   (transient [])
+           a_translate (transient [])
+           a_color     (transient [])]
+      (if (< char-i total-ch)
+        (let [[line-num ch] (get i->line+ch char-i)
+              baked-ch      (get-baked-char font-entity ch)
+
+              {:keys [w h xoff yoff ^double xadv]} baked-ch
+              y-total     (* line-num font-height)
+              total-xadv  (if (= line-num prev-line-num) total-xadv 0)
+
+              u_crop      (memo-crop font-entity baked-ch)
+              u_scaling   (m/scaling-matrix w h)
+              u_translate (m/translation-matrix (+ xoff total-xadv) (+ baseline yoff y-total))
+              u_color     [0.2 0.4 0.3 1]]
+          ;; (println (type line-num) (type xadv) (type total-xadv))
+          (recur (inc char-i) (+ total-xadv xadv) line-num
+                 (loop [a_texture a_texture i 0]
+                   (if (< i 9)
+                     (recur (conj! a_texture (nth u_crop i)) (inc i))
+                     a_texture))
+                 (loop [a_scaling a_scaling i 0]
+                   (if (< i 9)
+                     (recur (conj! a_scaling (nth u_scaling i)) (inc i))
+                     a_scaling))
+                 (loop [a_translate a_translate i 0]
+                   (if (< i 9)
+                     (recur (conj! a_translate (nth u_translate i)) (inc i))
+                     a_translate))
+                 (loop [a_color a_color i 0]
+                   (if (< i 4)
+                     (recur (conj! a_color (nth u_color i)) (inc i))
+                     a_color))))
+        (let [a_texture   (persistent! a_texture)
+              a_scaling   (persistent! a_scaling)
+              a_translate (persistent! a_translate)
+              a_color     (persistent! a_color)
+              res (-> dynamic-entity
+                      (update :attributes
+                              (fn [attrs]
+                                (assoc attrs
+                                       'a_texture_matrix {:data a_texture :divisor 1}
+                                       'a_scale_matrix {:data a_scaling :divisor 1}
+                                       'a_translate_matrix {:data a_translate :divisor 1}
+                                       'a_color {:data a_color :divisor 1}))))]
           ;; #?(:clj (do (throw (Exception. "hmm2"))))
           res)))))
 

@@ -92,7 +92,7 @@
                     "FPS"
                     (str/join " " (take text-mult (repeat (str fps))))]
               text (conj text "char count" (str (->> text (map count) (reduce +))))]
-          (c/render game (-> (chars/assoc-lines4 dynamic-entity font-entity text)
+          (c/render game (-> (chars/assoc-lines3 dynamic-entity font-entity text)
                              (t/project game-width game-height)
                              (t/translate 0 200)))))))
   ;; return the game map
