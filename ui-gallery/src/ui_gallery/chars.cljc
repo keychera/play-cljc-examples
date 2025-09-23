@@ -56,6 +56,7 @@
         char-code (- #?(:clj (int ch) :cljs (.charCodeAt ch 0)) first-char)]
     (nth baked-chars char-code)))
 
+;; original assoc refactored into function
 (defn assoc-lines0
   [dynamic-entity font-entity lines]
   (reduce
@@ -104,7 +105,7 @@
                                 (mapcat identity))
                           lines)
         total-ch    (count i->line+ch)]
-    (loop [char-i 0 total-xadv 0.0 prev-line-num -1 entity dynamic-entity]
+    (loop [char-i 0 total-xadv 0.0 prev-line-num #?(:clj (Long. -1) :cljs -1) entity dynamic-entity]
       (if (< char-i total-ch)
         (let [[line-num ch] (nth i->line+ch char-i)
               baked-ch      (get-baked-char font-entity ch)
@@ -185,7 +186,7 @@
           res)))))
 
 (defn assoc-lines4
-  [dynamic-entity font-entity lines]
+  [game dynamic-entity font-entity lines]
   (let [{:keys [baked-font]} font-entity
         baseline            (-> baked-font :baseline)
         font-height         (-> baked-font :font-height)
@@ -195,10 +196,10 @@
                                         (mapcat identity))
                                   lines)
         total-ch    (count i->line+ch)
-        a_texture   (float-array (* total-ch 9))
-        a_scaling   (float-array (* total-ch 9))
-        a_translate (float-array (* total-ch 9))
-        a_color     (float-array (* total-ch 4))]
+        a_texture   (#?(:clj float-array :cljs #(js/Float32Array. %)) (* total-ch 9))
+        a_scaling   (#?(:clj float-array :cljs #(js/Float32Array. %)) (* total-ch 9))
+        a_translate (#?(:clj float-array :cljs #(js/Float32Array. %)) (* total-ch 9))
+        a_color     (#?(:clj float-array :cljs #(js/Float32Array. %)) (* total-ch 4))]
     (loop [char-i 0 total-xadv 0.0 prev-line-num #?(:clj (Long. -1) :cljs -1)]
       (if (< char-i total-ch)
         (let [[line-num ch] (get i->line+ch char-i)
