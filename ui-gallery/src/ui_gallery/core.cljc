@@ -83,7 +83,7 @@
                            (t/project game-width game-height)
                            (t/translate 0 100)))
         ;; render the frame count
-        (let [text-mult 3000
+        (let [text-mult 5000
               fps (:fps @fps-counter*)
               text ["Frame count:"
                     (str/join " " (take text-mult (repeat (str counter))))
@@ -92,14 +92,7 @@
                     "FPS"
                     (str/join " " (take text-mult (repeat (str fps))))]
               text (conj text "char count" (str (->> text (map count) (reduce +))))]
-          (c/render game (-> #_(reduce
-                                (partial apply chars/assoc-char)
-                                dynamic-entity
-                                (for [line-num (range (count text))
-                                      char-num (range (count (nth text line-num)))
-                                      :let     [ch (get-in text [line-num char-num])]]
-                                  [line-num char-num (chars/crop-char font-entity ch)]))
-                             (chars/assoc-lines3 dynamic-entity font-entity text)
+          (c/render game (-> (chars/assoc-lines4 dynamic-entity font-entity text)
                              (t/project game-width game-height)
                              (t/translate 0 200)))))))
   ;; return the game map
