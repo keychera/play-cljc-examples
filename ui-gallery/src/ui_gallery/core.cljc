@@ -6,6 +6,7 @@
             [play-cljc.transforms :as t]
             [play-cljc.gl.text :as text]
             [play-cljc.instances :as i]
+            #?(:clj [clj-async-profiler.core :as prof])
             #?(:clj  [play-cljc.macros-java :refer [gl math]]
                :cljs [play-cljc.macros-js :refer-macros [gl math]])
             #?(:clj [ui-gallery.text :refer [load-font-clj]]))
@@ -49,6 +50,10 @@
       (vswap! fps-counter* assoc :last-time now :frames 0 :fps frames)
       (vswap! fps-counter* update :frames inc))))
 
+#?(:clj (def start-time (System/currentTimeMillis)))
+
+(def profiled? (atom false))
+
 (defn tick [game]
   (let [state (swap! *state update :counter inc)
         {:keys [font-entity
@@ -91,10 +96,16 @@
                     (str (* (:delta-time game) 1000) " ms")
                     "FPS"
                     (str/join " " (take text-mult (repeat (str fps))))]
-              text (conj text "char count" (str (->> text (map count) (reduce +))))]
-          (c/render game (-> (chars/assoc-lines4 dynamic-entity font-entity text)
-                             (t/project game-width game-height)
-                             (t/translate 0 200)))))))
+              text (conj text "char count" (str (->> text (map count) (reduce +))))
+              target-fn chars/assoc-lines6
+              render-fn #(c/render game (-> (target-fn dynamic-entity font-entity text)
+                                            (t/project game-width game-height)
+                                            (t/translate 0 200)))]
+          #?(:cljs (render-fn)
+             :clj (if (and (not @profiled?) (> (- (System/currentTimeMillis) start-time) 3000))
+                    (do (prof/profile (render-fn))
+                        (reset! profiled? true))
+                    (render-fn)))))))
   ;; return the game map
   game)
 

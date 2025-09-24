@@ -22,7 +22,10 @@
         org.lwjgl/lwjgl-glfw$natives-windows {:mvn/version "3.3.1"}
         org.lwjgl/lwjgl-opengl$natives-windows {:mvn/version "3.3.1"}
         org.lwjgl/lwjgl-stb$natives-windows {:mvn/version "3.3.1"}}
- :aliases {:dev {:extra-deps {org.clojure/clojurescript {:mvn/version "1.12.42"}
+ :aliases {:profile {:extra-deps {com.clojure-goes-fast/clj-async-profiler {:mvn/version "1.6.2"}}
+                     :main-opts ["jvm.clj"]
+                     :jvm-opts ["-Djdk.attach.allowAttachSelf"]}
+           :dev {:extra-deps {org.clojure/clojurescript {:mvn/version "1.12.42"}
                               com.bhauman/figwheel-main {:mvn/version "0.2.18"}}
                  :main-opts ["dev.clj"]}
            :prod {:extra-deps {org.clojure/clojurescript {:mvn/version "1.12.42"}

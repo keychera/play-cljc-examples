@@ -27,6 +27,11 @@ clj -M:dev native
 clj -M:dev:macos native
 ```
 
+profile command (profiling chars/assoc-lines one time after three seconds of render)
+```
+clj -M:profile native
+```
+
 
 To build the native version as a jar file:
 
