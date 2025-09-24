@@ -96,16 +96,18 @@
                     (str (* (:delta-time game) 1000) " ms")
                     "FPS"
                     (str/join " " (take text-mult (repeat (str fps))))]
-              text (conj text "char count" (str (->> text (map count) (reduce +))))
-              target-fn chars/assoc-lines6
-              render-fn #(c/render game (-> (target-fn dynamic-entity font-entity text)
-                                            (t/project game-width game-height)
-                                            (t/translate 0 200)))]
-          #?(:cljs (render-fn)
+              text (conj text "char count" (str (->> text (map count) (reduce +))))]
+          #?(:cljs (c/render game (-> (chars/assoc-lines6 dynamic-entity font-entity text)
+                                      (t/project game-width game-height)
+                                      (t/translate 0 200)))
              :clj (if (and (not @profiled?) (> (- (System/currentTimeMillis) start-time) 3000))
-                    (do (prof/profile (render-fn))
+                    (do (prof/profile (c/render game (-> (chars/assoc-lines6 dynamic-entity font-entity text)
+                                                         (t/project game-width game-height)
+                                                         (t/translate 0 200))))
                         (reset! profiled? true))
-                    (render-fn)))))))
+                    (c/render game (-> (chars/assoc-lines6 dynamic-entity font-entity text)
+                                       (t/project game-width game-height)
+                                       (t/translate 0 200)))))))))
   ;; return the game map
   game)
 
